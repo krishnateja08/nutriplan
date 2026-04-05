@@ -592,6 +592,13 @@ footer { text-align: center; padding: 24px; font-size: 12px; color: var(--text-m
           <div class="btn-option" onclick="selectOpt(this,'gender-group','Other')" data-i18n="other">Other</div>
         </div>
       </div>
+      <div class="field-group">
+        <label>Ethnicity <span style="font-size:10px;color:var(--text-muted);text-transform:none;letter-spacing:0;">Used for BMI thresholds (WHO guidelines)</span></label>
+        <div class="btn-group" id="ethnicity-group">
+          <div class="btn-option" onclick="selectOpt(this,'ethnicity-group','asian')" data-val="asian">🌏 Asian / South Asian</div>
+          <div class="btn-option" onclick="selectOpt(this,'ethnicity-group','non-asian')" data-val="non-asian">🌍 Other / Not specified</div>
+        </div>
+      </div>
     </div>
     <div class="form-section">
       <div class="section-title"><span class="section-icon">📏</span> <span data-i18n="body_meas">Body Measurements</span></div>
@@ -649,6 +656,7 @@ footer { text-align: center; padding: 24px; font-size: 12px; color: var(--text-m
         <div class="btn-option condition" onclick="toggleCondition(this,'thyroid')">🦋 Thyroid</div>
         <div class="btn-option condition" onclick="toggleCondition(this,'pcos')">🌸 PCOS</div>
         <div class="btn-option condition" onclick="toggleCondition(this,'heart')">💙 Heart Condition</div>
+        <div class="btn-option condition" onclick="toggleCondition(this,'kidney')">🫘 Kidney / Renal</div>
         <div class="btn-option condition" onclick="clearConditions(this)" data-i18n="none">✅ None</div>
       </div>
     </div>
@@ -670,6 +678,13 @@ footer { text-align: center; padding: 24px; font-size: 12px; color: var(--text-m
 
 <!-- ==================== DASHBOARD PAGE ==================== -->
 <div class="page" id="page-dashboard">
+  <!-- Firebase profile loading state -->
+  <div id="dashboard-loading" style="display:none;text-align:center;padding:60px 20px;">
+    <div style="font-size:48px;margin-bottom:16px;animation:spin 1.2s linear infinite;display:inline-block;">🌿</div>
+    <div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;margin-bottom:8px;">Loading your profile…</div>
+    <div style="color:var(--text-muted);font-size:14px;">Fetching your saved plan from the cloud</div>
+  </div>
+  <style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
   <div id="welcome-state" class="welcome-state">
     <div class="welcome-icon">🥗</div>
     <h2 data-i18n="welcome_h2">Your Dashboard Awaits</h2>
@@ -786,6 +801,7 @@ footer { text-align: center; padding: 24px; font-size: 12px; color: var(--text-m
           <div id="bmi-label" style="font-size:14px;color:var(--text-muted);margin-top:4px;">—</div>
         </div>
         <div style="margin-top:16px;font-size:13px;color:var(--text-muted);text-align:center;" id="bmi-advice"></div>
+        <div id="bmi-asian-note" style="display:none;margin-top:10px;font-size:12px;color:var(--sky);background:rgba(91,155,213,0.08);border:1px solid rgba(91,155,213,0.25);border-radius:8px;padding:8px 12px;text-align:left;line-height:1.5;"></div>
       </div>
       <div class="macro-card">
         <div class="macro-title" data-i18n="macro_breakdown">Macronutrient Breakdown</div>
@@ -1008,6 +1024,7 @@ footer { text-align: center; padding: 24px; font-size: 12px; color: var(--text-m
         <div><label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:6px;display:block;">Protein (g)</label><input type="number" id="fd-protein" placeholder="12"></div>
         <div><label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:6px;display:block;">Fiber (g)</label><input type="number" id="fd-fiber" placeholder="3"></div>
         <div><label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:6px;display:block;">Sat. Fat (g)</label><input type="number" id="fd-satfat" placeholder="2"></div>
+        <div id="fd-sodium-field"><label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:6px;display:block;">Sodium (mg)</label><input type="number" id="fd-sodium" placeholder="e.g. 480"></div>
         <div><label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:6px;display:block;">GI (0–100)</label><input type="number" id="fd-gi" placeholder="e.g. 55" min="0" max="100"></div>
         <div>
           <label style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:6px;display:block;">Quality</label>
@@ -1043,7 +1060,7 @@ footer { text-align: center; padding: 24px; font-size: 12px; color: var(--text-m
       </div>
       <div id="food-log-empty" style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px;">No foods logged yet — use quick presets or add above.</div>
       <table class="food-log-table" id="food-log-table" style="display:none;">
-        <thead><tr><th>Meal</th><th>Food Item</th><th>Calories</th><th>Protein</th><th>Fiber</th><th>Quality</th><th></th></tr></thead>
+        <thead><tr><th>Meal</th><th>Food Item</th><th>Calories</th><th>Protein</th><th>Fiber</th><th id="fd-sodium-col-header">Sodium</th><th>Quality</th><th></th></tr></thead>
         <tbody id="food-log-body"></tbody>
       </table>
       <div class="food-diary-totals" id="food-diary-totals" style="display:none;">
@@ -1051,6 +1068,7 @@ footer { text-align: center; padding: 24px; font-size: 12px; color: var(--text-m
         <div class="food-total-item">Protein: <span id="fd-total-protein">0</span>g</div>
         <div class="food-total-item">Fiber: <span id="fd-total-fiber">0</span>g</div>
         <div class="food-total-item">Sat.Fat: <span id="fd-total-satfat">0</span>g</div>
+        <div class="food-total-item" id="fd-sodium-total-item">Sodium: <span id="fd-total-sodium">0</span>mg</div>
         <div class="food-total-item">GL Est: <span id="fd-total-gl">—</span></div>
         <div style="margin-left:auto;font-size:12px;color:var(--text-muted);">Auto-fills Nutrition fields ↑</div>
       </div>
@@ -1440,7 +1458,13 @@ function actFactor(lv) { return {sedentary:1.2,light:1.375,moderate:1.55,very:1.
 function goalAdj(g) { return {lose:-400,maintain:0,gain:300,fitness:125}[g]||0; }
 function proteinMult(a,g) { if(g==='gain')return 2.0; if(a==='very'||a==='moderate')return 1.4; return 0.9; }
 function calcBMI(w,h) { return w/((h/100)**2); }
-function bmiCat(bmi) {
+function bmiCat(bmi, isAsian) {
+  if(isAsian){
+    if(bmi<18.5)return{label:'Underweight',color:'#5b9bd5'};
+    if(bmi<23)return{label:'Normal Weight',color:'#7a9e7e'};
+    if(bmi<27.5)return{label:'Overweight',color:'#c9a84c'};
+    return{label:'Obese',color:'#d4645a'};
+  }
   if(bmi<18.5)return{label:'Underweight',color:'#5b9bd5'};
   if(bmi<25)return{label:'Normal Weight',color:'#7a9e7e'};
   if(bmi<30)return{label:'Overweight',color:'#c9a84c'};
@@ -1558,7 +1582,10 @@ function generatePlan(silent) {
   // We apply a moderate cap of 1.6g/kg to be safe without over-restricting.
   if([...conditions].includes('diabetes'))    proteinPerKg = Math.min(proteinPerKg, 1.6);
   if([...conditions].includes('heart'))       proteinPerKg = Math.min(proteinPerKg, 1.4); // avoid excess animal protein
+  if([...conditions].includes('kidney'))      proteinPerKg = Math.min(proteinPerKg, 0.8); // CKD: WHO cap — high protein accelerates kidney decline
   if(gender==='Female' && age>=50)            proteinPerKg = Math.max(proteinPerKg, 1.2); // post-menopause muscle preservation
+  // Kidney cap overrides post-menopause increase
+  if([...conditions].includes('kidney') && gender==='Female' && age>=50) proteinPerKg = 0.8;
   const proteinG = Math.round(w * proteinPerKg);
 
   // ── FAT: personalized by diet, conditions, goal ──
@@ -1633,8 +1660,10 @@ function generatePlan(silent) {
   const rawWaterL = w * 0.035 * totalWaterMult;
   // Round to nearest 0.1L, min 2.0L, max 5.5L
   const waterL = Math.min(5.5, Math.max(2.0, Math.round(rawWaterL * 10) / 10));
+  const ethnicity = getSelected('ethnicity-group') || 'non-asian';
+  const isAsian = ethnicity === 'asian';
   const bmi = calcBMI(w,h);
-  const bmiCategory = bmiCat(bmi);
+  const bmiCategory = bmiCat(bmi, isAsian);
 
   // WHR calculation
   const waistCm = parseFloat(document.getElementById('waist-cm').value)||0;
@@ -1660,6 +1689,7 @@ function generatePlan(silent) {
     whr, whrRisk,
     tdee: Math.round(tdee),
     fiberTarget, sodiumTarget, proteinPerKg: Math.round(proteinPerKg*10)/10,
+    ethnicity, isAsian,
   };
 
   // Make plan accessible to Food Advisor
@@ -1718,6 +1748,16 @@ function renderDashboard() {
     'Obese':'Consult a healthcare provider. Small consistent changes work best.'
   };
   document.getElementById('bmi-advice').textContent = bmiAdvice[p.bmiCat.label]||'';
+  // Asian BMI note
+  const asianNoteEl = document.getElementById('bmi-asian-note');
+  if(asianNoteEl) {
+    if(p.isAsian) {
+      asianNoteEl.innerHTML = '🌏 <strong>Asian BMI thresholds applied</strong> (WHO): Overweight ≥23, Obese ≥27.5 — lower than standard due to higher metabolic risk at lower body fat.';
+      asianNoteEl.style.display = 'block';
+    } else {
+      asianNoteEl.style.display = 'none';
+    }
+  }
   drawBMIGauge(p.bmi, p.bmiCat.color);
   setTimeout(()=>{
     document.getElementById('bar-protein').style.width = p.proteinPct+'%';
@@ -1839,9 +1879,10 @@ function renderAlerts() {
 
   // ── HEALTH CONDITIONS — with diet+goal cross-references ──
   if(hasDiabetes){
+    const hasKidney=cond.includes('kidney');
     const carbNote=isKeto?'Your keto diet is well-suited for blood sugar control — monitor ketones and consult your doctor.':isVeg?'Choose low-GI carbs: brown rice, lentils, oats. Avoid maida, white rice, and sugary fruits in large portions.':'Focus on complex carbs. Grilled chicken/fish with non-starchy veg at lunch and dinner keeps glycaemic load low.';
     alerts.push({icon:'🩸',color:'#d4645a',title:'Diabetes — Personalised Nutrition',
-      text:`Carb target: ${p.carbG}g/day (${p.carbPct}% of calories). Distribute evenly across ${isLose?'4':'5'} meals to prevent spikes. ${carbNote} Post-meal walks of 15 min are clinically proven to reduce glucose peaks. Sodium limit: ${p.sodiumTarget}.`});
+      text:`Carb target: ${p.carbG}g/day (${p.carbPct}% of calories). Distribute evenly across ${isLose?'4':'5'} meals to prevent spikes. ${carbNote} Post-meal walks of 15 min are clinically proven to reduce glucose peaks. Sodium limit: ${p.sodiumTarget}. 🥬 Bitter Melon (Karela/Goya): small clinical studies show it supports blood sugar regulation — try stir-fried or juiced as a natural adjunct.${hasKidney?' ⚠️ Kidney condition detected — protein is capped at 0.8g/kg and phosphorus-rich foods (dairy, nuts, cola) should be limited. Consult your nephrologist.':''}`});
   }
   if(hasHypertension){
     const dietNote=isVegan||isVeg?'Your plant-based diet is naturally lower in sodium — advantage for BP control.':isKeto?'Keto can raise LDL in some people — monitor lipids regularly alongside BP.':'Choose grilled over fried, reduce pickles, papads, and processed meats.';
@@ -1863,16 +1904,20 @@ function renderAlerts() {
     alerts.push({icon:'🦋',color:'#8e7dbe',title:'Thyroid — Personalised Nutrition',
       text:`Consistent meal timing is especially important for thyroid function — eat at the same times daily. ${dietNote} Avoid taking thyroid medication with high-calcium or high-iron foods — they block absorption. ${isOlder?'Thyroid disorders increase with age — ensure regular monitoring.':''}`});
   }
+  if(cond.includes('kidney')){
+    alerts.push({icon:'🫘',color:'#8e7dbe',title:'Kidney / Renal — Personalised Plan',
+      text:`⚠️ Protein is capped at 0.8g/kg (${p.proteinG}g/day) — the WHO CKD limit to slow renal decline. Limit high-phosphorus foods: dairy, dark colas, processed meats, nuts in excess. Potassium needs careful management — avoid high-potassium foods (bananas, oranges, potatoes) if your nephrologist advises. Sodium: ${p.sodiumTarget}. Stay hydrated with ${p.waterL}L water/day unless your doctor recommends a fluid restriction. Always co-ordinate this plan with your nephrologist.`});
+  }
 
   // ── DIET-SPECIFIC ALERTS (cross-referenced with goal/gender) ──
   if(isVegan){
     const b12note=isLose?'B12 deficiency causes fatigue which makes weight loss harder — supplement is essential.':isGain?'B12 supports nerve function needed for effective strength training.':'B12 is non-negotiable on a vegan diet.';
     alerts.push({icon:'🌿',color:'#4d7352',title:'Vegan Nutrition — Personalised Targets',
-      text:`Critical nutrients to monitor: B12 (supplement 250–1000mcg/day — ${b12note}), Omega-3 (algae oil 250–500mg DHA/EPA), Iron (${isFemale?'18mg':'8mg'}/day from lentils, tofu, seeds + vitamin C), Zinc (11mg — pumpkin seeds, legumes), Calcium (1000mg — fortified plant milk, tofu, bok choy), Iodine (seaweed or supplement). Protein at ${p.proteinG}g is achievable with: tempeh, edamame, tofu, lentils, seitan.`});
+      text:`Critical nutrients to monitor: B12 (supplement 250–1000mcg/day — ${b12note}), Omega-3 (algae oil 250–500mg DHA/EPA), Iron (${isFemale?'18mg':'8mg'}/day from lentils, tofu, seeds + vitamin C), Zinc (11mg — pumpkin seeds, legumes), Calcium (1000mg — calcium-set tofu, fortified soy/oat milk, bok choy, kale; lactose intolerance is common in Asian populations so dairy-free sources are especially important), Iodine (seaweed or supplement). Protein at ${p.proteinG}g is achievable with: tempeh, edamame, tofu, lentils, seitan.`});
   }
   if(isVeg&&!isVegan){
     alerts.push({icon:'🌱',color:'#4d7352',title:'Vegetarian Nutrition — Personalised Targets',
-      text:`Your protein target of ${p.proteinG}g/day: paneer (${isLose?'in moderation':'freely'}), Greek yogurt, eggs, lentils, chickpeas, cottage cheese. Iron absorption from plants is lower — pair with vitamin C at each meal. ${isFemale?'Women need 18mg iron/day — prioritise it.':''} B12 is available via dairy/eggs but check levels annually. ${hasHeart||hasDiabetes?'Use low-fat dairy to keep saturated fat in check.':''}`});
+      text:`Your protein target of ${p.proteinG}g/day: paneer (${isLose?'in moderation':'freely'}), Greek yogurt, eggs, lentils, chickpeas, cottage cheese. Iron absorption from plants is lower — pair with vitamin C at each meal. ${isFemale?'Women need 18mg iron/day — prioritise it.':''} B12 is available via dairy/eggs but check levels annually. ${hasHeart||hasDiabetes?'Use low-fat dairy to keep saturated fat in check.':''} 🦴 Calcium (1000mg): if lactose intolerant (common in South/East Asian populations), use calcium-set tofu, fortified oat/soy milk, or small dried fish/anchovies as alternatives to dairy.`});
   }
   if(isKeto){
     alerts.push({icon:'🥑',color:'#4d7352',title:'Keto Diet — Personalised Targets',
@@ -2197,7 +2242,7 @@ function renderMicronutrients() {
       sources: isVegan?'Lentils, tofu, pumpkin seeds, spinach, fortified cereal + vitamin C':
                isVeg?'Lentils, spinach, eggs, beans, dark chocolate + vitamin C':
                'Lean red meat, chicken, fish, lentils, spinach, beans',
-      priority: isFemale&&p.age<50?'important': hasPCOS?'important': isVegan||isVeg?'moderate':'good',
+      priority: isFemale&&p.age<50?'important': hasPCOS?'important': isVegan?'important': isVeg?'important':'good',
       note: isFemale&&p.age<50?`⚠️ 18mg/day — menstruating women are at highest risk of deficiency. Pair plant sources with vitamin C.`:
             hasPCOS?'⚠️ PCOS + heavy periods increases iron loss — monitor levels':
             isVegan||isVeg?'Plant iron (non-haem) absorbs 2–3x less — pair with vitamin C at every meal':
@@ -2536,14 +2581,15 @@ function addFoodEntry(){
   const protein=parseFloat(document.getElementById('fd-protein').value)||0;
   const fiber=parseFloat(document.getElementById('fd-fiber').value)||0;
   const satfat=parseFloat(document.getElementById('fd-satfat').value)||0;
+  const sodium=parseFloat(document.getElementById('fd-sodium').value)||0;
   const gi=parseFloat(document.getElementById('fd-gi').value)||0;
   const quality=document.getElementById('fd-quality').value;
   const meal=document.getElementById('fd-meal').value;
   if(!name||!cal){showToast('\u26a0\ufe0f','Missing Info','Please enter food name and calories.',true);return;}
   const estCarbs=Math.round((cal-protein*4-satfat*9)/4);
   const gl=gi>0?Math.round(gi*Math.max(0,estCarbs)/100):0;
-  foodDiary.push({id:Date.now(),meal,name,cal,protein,fiber,satfat,gi,gl,quality});
-  ['fd-name','fd-cal','fd-protein','fd-fiber','fd-satfat','fd-gi'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  foodDiary.push({id:Date.now(),meal,name,cal,protein,fiber,satfat,sodium,gi,gl,quality});
+  ['fd-name','fd-cal','fd-protein','fd-fiber','fd-satfat','fd-sodium','fd-gi'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   const qEl=document.getElementById('fd-quality'); if(qEl)qEl.value='whole';
   renderFoodDiary();
   renderMealSwaps();
@@ -2569,6 +2615,8 @@ function renderFoodDiary(){
   const qualityIcons={whole:'🌱',minimally:'🥗',processed:'🧂',ultra:'🍟'};
   const qualityColors={whole:'var(--sage-dark)',minimally:'var(--sage)',processed:'var(--gold)',ultra:'var(--soft-red)'};
   table.style.display='table'; empty.style.display='none'; totalsEl.style.display='flex';
+  const hasHypertension = plan && plan.conditions && plan.conditions.includes('hypertension');
+  const sodiumLimit = hasHypertension ? 1500 : 2300;
   tbody.innerHTML=foodDiary.map(f=>`
     <tr>
       <td><span style="font-size:12px;background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:2px 10px;white-space:nowrap;">${f.meal}</span></td>
@@ -2576,6 +2624,7 @@ function renderFoodDiary(){
       <td>${f.cal} kcal</td>
       <td>${f.protein}g</td>
       <td>${f.fiber||0}g</td>
+      <td>${f.sodium?f.sodium+'mg':'—'}</td>
       <td><span style="font-size:11px;color:${qualityColors[f.quality]||'var(--text-muted)'};">${qualityIcons[f.quality]||''} ${(f.quality||'').replace('minimally','Min.Proc.').replace('processed','Proc.').replace('ultra','Ultra-Proc.').replace('whole','Whole')}</span></td>
       <td><button class="food-delete-btn" onclick="removeFoodEntry(${f.id})">&#x2715;</button></td>
     </tr>`).join('');
@@ -2583,11 +2632,21 @@ function renderFoodDiary(){
   const totalProtein=foodDiary.reduce((s,f)=>s+f.protein,0);
   const totalFiber=foodDiary.reduce((s,f)=>s+(f.fiber||0),0);
   const totalSatfat=foodDiary.reduce((s,f)=>s+(f.satfat||0),0);
+  const totalSodium=foodDiary.reduce((s,f)=>s+(f.sodium||0),0);
   const totalGL=foodDiary.reduce((s,f)=>s+(f.gl||0),0);
   document.getElementById('fd-total-cal').textContent=totalCal;
   document.getElementById('fd-total-protein').textContent=totalProtein;
   document.getElementById('fd-total-fiber').textContent=totalFiber;
   document.getElementById('fd-total-satfat').textContent=totalSatfat;
+  // Sodium total with colour-coding
+  const sodiumEl=document.getElementById('fd-total-sodium');
+  const sodiumTotalItem=document.getElementById('fd-sodium-total-item');
+  if(sodiumEl){
+    sodiumEl.textContent=totalSodium;
+    const sodiumColor=totalSodium===0?'var(--text-muted)':totalSodium>sodiumLimit?'var(--soft-red)':totalSodium>sodiumLimit*0.75?'var(--gold)':'var(--sage-dark)';
+    sodiumEl.style.color=sodiumColor;
+    if(sodiumTotalItem) sodiumTotalItem.title=`Limit: ${sodiumLimit}mg/day${hasHypertension?' (hypertension)':''}`;
+  }
   const glEl=document.getElementById('fd-total-gl');
   if(glEl){
     const glLabel=totalGL===0?'—':totalGL<80?totalGL+' Low':totalGL<120?totalGL+' Moderate':totalGL+' High';
@@ -3804,6 +3863,11 @@ function getVerdict(food, profile) {
     if (f.sugar > 10) { score -= 2; tips.push({ type: 'alert', text: `🩸 Diabetes alert: Contains ${f.sugar}g sugar — can spike blood glucose. Choose low-GI alternatives.` }); }
     else if (f.sugar <= 3) { score += 1; tips.push({ type: 'good', text: `✅ Low sugar (${f.sugar}g) — suitable for blood sugar management.` }); }
     if (f.fiber >= 4) { score += 1; tips.push({ type: 'good', text: `✅ High fiber (${f.fiber}g) — slows glucose absorption, beneficial for diabetes.` }); }
+    // Mandatory GI pairing alert for high-carb staples
+    const highGIKeys = ['white rice','rice','naan','roti','white bread','bread','dosa','idli','poha','upma','cornflakes','bagel','potato'];
+    if (highGIKeys.some(k => food.key.includes(k)) || f.carbs > 40) {
+      tips.push({ type: 'alert', text: `🩸 High-carb food + Diabetes: Always pair with protein (paneer, eggs, dal, chicken) and fiber (sabzi, salad) to blunt the glucose spike. Eating this alone can cause a sharp glycaemic rise.` });
+    }
     if (['cola','orange juice','jalebi','gulab jamun','chocolate'].includes(food.key)) { score -= 3; }
   }
   if (conditions.includes('hypertension')) {
@@ -4138,6 +4202,15 @@ function updateProfileBar(user) {
 
 async function loadProfile(user) {
   if (!user) return;
+  // Show loading state on dashboard
+  const loadingEl = document.getElementById('dashboard-loading');
+  const contentEl = document.getElementById('dashboard-content');
+  const welcomeEl = document.getElementById('welcome-state');
+  if (loadingEl && contentEl && welcomeEl) {
+    welcomeEl.style.display = 'none';
+    contentEl.style.display = 'none';
+    loadingEl.style.display = 'block';
+  }
   setStatus('Loading your profile...', '#c9a84c');
   try {
     const snap = await getDoc(doc(db, 'profiles', user.uid));
@@ -4156,6 +4229,7 @@ async function loadProfile(user) {
       }
       if (d.weightUnit) document.getElementById('weight-unit').value = d.weightUnit;
       if (d.gender)   setButtonGroup('gender-group', d.gender);
+      if (d.ethnicity) setButtonGroup('ethnicity-group', d.ethnicity);
       if (d.activity) setButtonGroup('activity-group', d.activity);
       if (d.goal)     setButtonGroup('goal-group', d.goal);
       if (d.diet)     setButtonGroup('diet-group', d.diet);
@@ -4173,14 +4247,21 @@ async function loadProfile(user) {
       setStatus('Profile loaded ✓', '#7a9e7e');
       if (window.showToast) window.showToast('👤', 'Welcome back!', 'Your plan is ready, ' + (user.displayName?.split(' ')[0] || '') + '!');
       // Auto-generate plan so dashboard & Food Advisor populate instantly
+      // Hide spinner only after plan is built
       setTimeout(() => {
         if (window.generatePlan) window.generatePlan(true);
+        if (loadingEl) loadingEl.style.display = 'none';
       }, 300);
     } else {
+      // New user — hide spinner, show welcome state
+      if (loadingEl) loadingEl.style.display = 'none';
+      if (welcomeEl) welcomeEl.style.display = 'block';
       setStatus('New profile — fill in your details & save', '#c9a84c');
       if (window.showToast) window.showToast('👋', 'Welcome!', 'Fill in your profile and click Save or Generate Plan.');
     }
   } catch(e) {
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (welcomeEl) welcomeEl.style.display = 'block';
     setStatus('Could not load profile', '#d4645a');
     console.error(e);
   }
@@ -4235,6 +4316,7 @@ window.fbSaveProfile = async function() {
     heightUnit:   document.getElementById('height-unit')?.value || 'cm',
     weightUnit:   document.getElementById('weight-unit')?.value || 'kg',
     gender:       getSelected('gender-group'),
+    ethnicity:    getSelected('ethnicity-group') || 'non-asian',
     activity:     getSelected('activity-group'),
     goal:         getSelected('goal-group'),
     diet:         getSelected('diet-group'),
