@@ -1447,8 +1447,8 @@ function bmiCat(bmi) {
 }
 
 // ========== GENERATE PLAN ==========
-function generatePlan() {
-  console.log('generatePlan() called'); // Debug log
+function generatePlan(silent) {
+  if (!silent) console.log('generatePlan() called'); // Debug log
   
   // Clear any previous error highlights
   document.querySelectorAll('.field-error').forEach(el => el.classList.remove('field-error'));
@@ -1518,20 +1518,13 @@ function generatePlan() {
   }
   
   if(missing.length > 0){
-    const fields = missing.join(', ');
-    showToast('⚠️','Missing Required Fields',`Please fill in: ${fields}`,true);
-    console.log('Missing fields:', missing);
-    
-    // Scroll to first error with smooth animation
-    if(firstErrorElement) {
-      firstErrorElement.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'center' 
-      });
-      // Focus the input if it's a text field
-      const input = firstErrorElement.querySelector('input');
-      if(input) {
-        setTimeout(() => input.focus(), 500);
+    if (!silent) {
+      const fields = missing.join(', ');
+      showToast('⚠️','Missing Required Fields',`Please fill in: ${fields}`,true);
+      if(firstErrorElement) {
+        firstErrorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const input = firstErrorElement.querySelector('input');
+        if(input) setTimeout(() => input.focus(), 500);
       }
     }
     return;
@@ -1678,8 +1671,13 @@ function generatePlan() {
   renderHabits();
   renderWater();
   renderMealPlan();
-  showToast('✅','Plan Generated!',`Welcome${name?' '+name:''}! Your personalised plan is ready.`);
-  showPage('dashboard');
+  if (!silent) {
+    showToast('✅','Plan Generated!',`Welcome${name?' '+name:''}! Your personalised plan is ready.`);
+    showPage('dashboard');
+  } else {
+    // Auto-loaded from Firebase — go to dashboard silently
+    showPage('dashboard');
+  }
 }
 
 // ========== DASHBOARD ==========
@@ -4166,7 +4164,11 @@ async function loadProfile(user) {
         }
       }
       setStatus('Profile loaded ✓', '#7a9e7e');
-      if (window.showToast) window.showToast('👤', 'Welcome back!', 'Your profile has been loaded, ' + (user.displayName?.split(' ')[0] || '') + '!');
+      if (window.showToast) window.showToast('👤', 'Welcome back!', 'Your plan is ready, ' + (user.displayName?.split(' ')[0] || '') + '!');
+      // Auto-generate plan so dashboard & Food Advisor populate instantly
+      setTimeout(() => {
+        if (window.generatePlan) window.generatePlan(true);
+      }, 300);
     } else {
       setStatus('New profile — fill in your details & save', '#c9a84c');
       if (window.showToast) window.showToast('👋', 'Welcome!', 'Fill in your profile and click Save or Generate Plan.');
