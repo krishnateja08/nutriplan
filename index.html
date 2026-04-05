@@ -1406,6 +1406,7 @@ function onHeightUnitChange(){
     input.removeAttribute('step');
   }
 }
+window.onHeightUnitChange = onHeightUnitChange;
 function selectOpt(el, group, val) {
   document.querySelectorAll('#' + group + ' .btn-option').forEach(b => b.classList.remove('selected'));
   el.classList.add('selected');
@@ -4146,7 +4147,13 @@ async function loadProfile(user) {
       if (d.age)    document.getElementById('age').value = d.age;
       if (d.height) document.getElementById('height').value = d.height;
       if (d.weight) document.getElementById('weight').value = d.weight;
-      if (d.heightUnit) document.getElementById('height-unit').value = d.heightUnit;
+      if (d.heightUnit) {
+        document.getElementById('height-unit').value = d.heightUnit;
+        if (window.onHeightUnitChange) window.onHeightUnitChange();
+      }
+      if (d.heightInches !== undefined && d.heightInches !== null) {
+        document.getElementById('height-inches').value = d.heightInches;
+      }
       if (d.weightUnit) document.getElementById('weight-unit').value = d.weightUnit;
       if (d.gender)   setButtonGroup('gender-group', d.gender);
       if (d.activity) setButtonGroup('activity-group', d.activity);
@@ -4223,6 +4230,7 @@ window.fbSaveProfile = async function() {
     name:         document.getElementById('name')?.value || '',
     age:          document.getElementById('age')?.value || '',
     height:       document.getElementById('height')?.value || '',
+    heightInches: document.getElementById('height-inches')?.value || '0',
     weight:       document.getElementById('weight')?.value || '',
     heightUnit:   document.getElementById('height-unit')?.value || 'cm',
     weightUnit:   document.getElementById('weight-unit')?.value || 'kg',
