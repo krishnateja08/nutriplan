@@ -569,6 +569,7 @@ footer { text-align: center; padding: 24px; font-size: 12px; color: var(--text-m
   <div class="nav-tab" onclick="showPage('micronutrients')"><span>💊</span> <span data-i18n="tab_micro">Micronutrients</span></div>
   <div class="nav-tab" onclick="showPage('weekly')"><span>📈</span> <span data-i18n="tab_weekly">Weekly Insights</span></div>
   <div class="nav-tab" onclick="showPage('reminders')"><span>⏰</span> <span data-i18n="tab_reminders">Reminders</span></div>
+  <div class="nav-tab" onclick="showPage('foodadvisor')"><span>🥦</span> Food Advisor</div>
 </nav>
 
 <!-- ==================== PROFILE PAGE ==================== -->
@@ -1666,6 +1667,9 @@ function generatePlan() {
     tdee: Math.round(tdee),
     fiberTarget, sodiumTarget, proteinPerKg: Math.round(proteinPerKg*10)/10,
   };
+
+  // Make plan accessible to Food Advisor
+  window.currentPlan = plan;
 
   waterTarget = Math.round(waterL*4);
   renderDashboard();
@@ -3462,6 +3466,621 @@ function renderFoodGuidance() {
     <div id="fb-login-status"></div>
   </div>
 </div>
+
+<!-- ==================== FOOD ADVISOR PAGE ==================== -->
+<div class="page" id="page-foodadvisor">
+  <div class="page-header">
+    <div class="page-title">🥦 Food Advisor</div>
+    <div class="page-subtitle">Search any food or drink — get instant calorie info & personalised advice based on your profile</div>
+  </div>
+
+  <!-- Profile Summary Strip -->
+  <div id="fa-profile-strip" style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px 22px;margin-bottom:24px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;box-shadow:var(--shadow);">
+    <span style="font-size:13px;font-weight:700;color:var(--sage-dark);">📋 Your Profile:</span>
+    <span id="fa-strip-goal" style="font-size:12px;background:var(--bg2);padding:4px 12px;border-radius:20px;color:var(--charcoal);font-weight:500;">Goal: —</span>
+    <span id="fa-strip-diet" style="font-size:12px;background:var(--bg2);padding:4px 12px;border-radius:20px;color:var(--charcoal);font-weight:500;">Diet: —</span>
+    <span id="fa-strip-cal" style="font-size:12px;background:var(--bg2);padding:4px 12px;border-radius:20px;color:var(--charcoal);font-weight:500;">Daily Cal: —</span>
+    <span id="fa-strip-cond" style="font-size:12px;background:rgba(212,100,90,0.1);padding:4px 12px;border-radius:20px;color:var(--soft-red);font-weight:500;display:none;">⚠️ Conditions: —</span>
+    <span id="fa-strip-noprofile" style="font-size:12px;color:var(--text-muted);">Generate your profile first for personalised advice. <button onclick="showPage('profile')" style="background:none;border:none;color:var(--sage-dark);font-weight:700;cursor:pointer;text-decoration:underline;">Set up →</button></span>
+  </div>
+
+  <!-- Search Bar -->
+  <div style="background:var(--card);border-radius:16px;padding:24px;border:1px solid var(--border);box-shadow:var(--shadow);margin-bottom:24px;">
+    <div style="font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;margin-bottom:16px;">🔍 What are you eating or drinking?</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <input type="text" id="fa-input" placeholder="e.g. banana, chai tea, samosa, pizza slice, orange juice..." 
+             style="flex:1;min-width:200px;padding:14px 18px;border:1.5px solid var(--border);border-radius:12px;font-size:15px;font-family:'DM Sans',sans-serif;background:var(--input-bg);color:var(--charcoal);outline:none;"
+             onkeydown="if(event.key==='Enter') advisorSearch()"
+             oninput="showFaSuggestions(this.value)">
+      <button onclick="advisorSearch()" style="background:var(--sage-dark);color:white;border:none;padding:14px 28px;border-radius:12px;font-size:15px;font-weight:600;cursor:pointer;transition:background 0.2s;white-space:nowrap;" onmouseover="this.style.background='var(--sage)'" onmouseout="this.style.background='var(--sage-dark)'">Analyse →</button>
+    </div>
+
+    <!-- Autocomplete suggestions -->
+    <div id="fa-suggestions" style="display:none;margin-top:8px;border:1px solid var(--border);border-radius:10px;background:var(--card);overflow:hidden;box-shadow:var(--shadow);"></div>
+
+    <!-- Quick presets -->
+    <div style="margin-top:16px;">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-muted);margin-bottom:10px;">Quick search:</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;" id="fa-presets"></div>
+    </div>
+  </div>
+
+  <!-- Result Card -->
+  <div id="fa-result" style="display:none;"></div>
+
+  <!-- History -->
+  <div id="fa-history-section" style="display:none;margin-top:28px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;">🕓 Today's Searched Foods</div>
+      <button onclick="clearFaHistory()" style="background:none;border:1px solid var(--border);color:var(--text-muted);padding:5px 14px;border-radius:20px;font-size:12px;cursor:pointer;">Clear</button>
+    </div>
+    <div id="fa-history-list" style="display:flex;flex-wrap:wrap;gap:10px;"></div>
+  </div>
+</div>
+
+<style>
+.fa-result-card { background:var(--card); border-radius:16px; padding:28px; border:1px solid var(--border); box-shadow:var(--shadow); margin-bottom:16px; }
+.fa-verdict { display:flex; align-items:center; gap:16px; padding:18px 22px; border-radius:14px; margin-bottom:20px; }
+.fa-verdict.eat   { background:rgba(122,158,126,0.12); border:1.5px solid var(--sage); }
+.fa-verdict.limit { background:rgba(201,168,76,0.10); border:1.5px solid var(--gold); }
+.fa-verdict.avoid { background:rgba(212,100,90,0.10); border:1.5px solid var(--soft-red); }
+.fa-verdict-icon { font-size:40px; flex-shrink:0; }
+.fa-verdict-label { font-family:'Cormorant Garamond',serif; font-size:22px; font-weight:700; }
+.fa-verdict.eat   .fa-verdict-label { color:var(--sage-dark); }
+.fa-verdict.limit .fa-verdict-label { color:#8a6a00; }
+.fa-verdict.avoid .fa-verdict-label { color:var(--soft-red); }
+.fa-verdict-reason { font-size:13px; color:var(--text-muted); margin-top:4px; line-height:1.5; }
+.fa-macro-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:12px; margin-bottom:20px; }
+.fa-macro-box { background:var(--bg2); border-radius:12px; padding:14px 16px; text-align:center; border:1px solid var(--border); }
+.fa-macro-val { font-family:'Cormorant Garamond',serif; font-size:28px; font-weight:700; color:var(--charcoal); }
+.fa-macro-unit { font-size:12px; color:var(--text-muted); }
+.fa-macro-lbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-muted); margin-top:4px; }
+.fa-tag { display:inline-block; font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; margin:3px 3px 3px 0; letter-spacing:0.03em; }
+.fa-tag-good { background:rgba(122,158,126,0.15); color:var(--sage-dark); }
+.fa-tag-warn { background:rgba(201,168,76,0.15); color:#7a5a00; }
+.fa-tag-bad  { background:rgba(212,100,90,0.12); color:var(--soft-red); }
+.fa-tip { display:flex; align-items:flex-start; gap:10px; padding:12px 14px; border-radius:10px; background:var(--bg2); border-left:3px solid var(--sage); margin-bottom:8px; font-size:13px; line-height:1.5; }
+.fa-tip.warn { border-left-color:var(--gold); }
+.fa-tip.alert { border-left-color:var(--soft-red); }
+.fa-suggestion-item { padding:10px 16px; cursor:pointer; font-size:14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; transition:background 0.15s; }
+.fa-suggestion-item:last-child { border-bottom:none; }
+.fa-suggestion-item:hover { background:var(--bg2); }
+.fa-history-chip { background:var(--card); border:1.5px solid var(--border); border-radius:20px; padding:7px 16px; font-size:13px; font-weight:500; cursor:pointer; transition:all 0.2s; display:flex; align-items:center; gap:7px; }
+.fa-history-chip:hover { border-color:var(--sage); color:var(--sage-dark); }
+.fa-cal-bar-wrap { margin-bottom:20px; }
+.fa-cal-bar-track { height:12px; background:var(--bg2); border-radius:6px; overflow:hidden; margin-top:6px; }
+.fa-cal-bar-fill { height:100%; border-radius:6px; transition:width 0.6s ease; }
+</style>
+
+<script>
+// ==================== FOOD DATABASE ====================
+const FOOD_DB = {
+  // Fruits
+  "banana":          { cal:89,  protein:1.1, carbs:23, fat:0.3, fiber:2.6, sugar:12, sodium:1,   serving:"1 medium (118g)", category:"fruit",    tags:["natural sugar","potassium","quick energy"], dietOk:["all"] },
+  "apple":           { cal:52,  protein:0.3, carbs:14, fat:0.2, fiber:2.4, sugar:10, sodium:1,   serving:"1 medium (182g)", category:"fruit",    tags:["fiber","antioxidants","vitamin C"], dietOk:["all"] },
+  "mango":           { cal:60,  protein:0.8, carbs:15, fat:0.4, fiber:1.6, sugar:13.7,sodium:1,  serving:"100g",            category:"fruit",    tags:["vitamin C","beta-carotene","high sugar"], dietOk:["all"] },
+  "orange":          { cal:47,  protein:0.9, carbs:12, fat:0.1, fiber:2.4, sugar:9,  sodium:0,   serving:"1 medium (131g)", category:"fruit",    tags:["vitamin C","fiber","hydrating"], dietOk:["all"] },
+  "grapes":          { cal:69,  protein:0.7, carbs:18, fat:0.2, fiber:0.9, sugar:15, sodium:2,   serving:"100g",            category:"fruit",    tags:["antioxidants","high sugar"], dietOk:["all"] },
+  "watermelon":      { cal:30,  protein:0.6, carbs:8,  fat:0.2, fiber:0.4, sugar:6,  sodium:1,   serving:"100g",            category:"fruit",    tags:["hydrating","low calorie","lycopene"], dietOk:["all"] },
+  "strawberries":    { cal:32,  protein:0.7, carbs:8,  fat:0.3, fiber:2,   sugar:5,  sodium:1,   serving:"100g",            category:"fruit",    tags:["vitamin C","low sugar","antioxidants"], dietOk:["all"] },
+  "papaya":          { cal:43,  protein:0.5, carbs:11, fat:0.3, fiber:1.7, sugar:8,  sodium:8,   serving:"100g",            category:"fruit",    tags:["digestive enzyme","vitamin C","anti-inflammatory"], dietOk:["all"] },
+  "guava":           { cal:68,  protein:2.6, carbs:14, fat:1,   fiber:5.4, sugar:9,  sodium:2,   serving:"100g",            category:"fruit",    tags:["very high fiber","vitamin C","protein"], dietOk:["all"] },
+  "pomegranate":     { cal:83,  protein:1.7, carbs:19, fat:1.2, fiber:4,   sugar:14, sodium:3,   serving:"100g",            category:"fruit",    tags:["antioxidants","heart-healthy","fiber"], dietOk:["all"] },
+  // Vegetables
+  "spinach":         { cal:23,  protein:2.9, carbs:3.6,fat:0.4, fiber:2.2, sugar:0.4,sodium:79,  serving:"100g",            category:"vegetable",tags:["iron","folate","very low cal"], dietOk:["all"] },
+  "broccoli":        { cal:34,  protein:2.8, carbs:7,  fat:0.4, fiber:2.6, sugar:1.7,sodium:33,  serving:"100g",            category:"vegetable",tags:["vitamin C","cancer-fighting","fiber"], dietOk:["all"] },
+  "carrot":          { cal:41,  protein:0.9, carbs:10, fat:0.2, fiber:2.8, sugar:4.7,sodium:69,  serving:"100g",            category:"vegetable",tags:["beta-carotene","fiber","low cal"], dietOk:["all"] },
+  "tomato":          { cal:18,  protein:0.9, carbs:3.9,fat:0.2, fiber:1.2, sugar:2.6,sodium:5,   serving:"100g",            category:"vegetable",tags:["lycopene","vitamin C","low cal"], dietOk:["all"] },
+  "cucumber":        { cal:16,  protein:0.7, carbs:3.6,fat:0.1, fiber:0.5, sugar:1.7,sodium:2,   serving:"100g",            category:"vegetable",tags:["hydrating","very low cal","refreshing"], dietOk:["all"] },
+  "onion":           { cal:40,  protein:1.1, carbs:9,  fat:0.1, fiber:1.7, sugar:4.2,sodium:4,   serving:"100g",            category:"vegetable",tags:["antioxidants","flavonoids"], dietOk:["all"] },
+  "potato":          { cal:77,  protein:2,   carbs:17, fat:0.1, fiber:2.2, sugar:0.8,sodium:6,   serving:"100g",            category:"vegetable",tags:["potassium","starchy","filling"], dietOk:["all"] },
+  "sweet potato":    { cal:86,  protein:1.6, carbs:20, fat:0.1, fiber:3,   sugar:4.2,sodium:55,  serving:"100g",            category:"vegetable",tags:["beta-carotene","complex carbs","fiber"], dietOk:["all"] },
+  "cauliflower":     { cal:25,  protein:1.9, carbs:5,  fat:0.3, fiber:2,   sugar:1.9,sodium:30,  serving:"100g",            category:"vegetable",tags:["low carb","vitamin C","versatile"], dietOk:["all"] },
+  "mushroom":        { cal:22,  protein:3.1, carbs:3.3,fat:0.3, fiber:1,   sugar:2,  sodium:5,   serving:"100g",            category:"vegetable",tags:["vitamin D","protein","low cal"], dietOk:["all"] },
+  // Grains & Carbs
+  "white rice":      { cal:130, protein:2.7, carbs:28, fat:0.3, fiber:0.4, sugar:0,  sodium:1,   serving:"100g cooked",     category:"grain",    tags:["high GI","staple","easy digest"], dietOk:["all"] },
+  "brown rice":      { cal:112, protein:2.6, carbs:24, fat:0.9, fiber:1.8, sugar:0,  sodium:5,   serving:"100g cooked",     category:"grain",    tags:["whole grain","fiber","lower GI"], dietOk:["all"] },
+  "oats":            { cal:68,  protein:2.4, carbs:12, fat:1.4, fiber:1.7, sugar:0.3,sodium:49,  serving:"100g cooked",     category:"grain",    tags:["beta-glucan","heart-healthy","filling"], dietOk:["all"] },
+  "chapati":         { cal:104, protein:3.1, carbs:18, fat:2.6, fiber:2.7, sugar:0.3,sodium:190, serving:"1 chapati (40g)", category:"grain",    tags:["whole wheat","fiber","staple"], dietOk:["vegetarian","non-veg","vegan"] },
+  "white bread":     { cal:79,  protein:2.7, carbs:15, fat:1,   fiber:0.6, sugar:1.4,sodium:152, serving:"1 slice (30g)",   category:"grain",    tags:["refined","high GI","low fiber"], dietOk:["all"] },
+  "idli":            { cal:39,  protein:1.9, carbs:7.9,fat:0.2, fiber:0.5, sugar:0,  sodium:110, serving:"1 idli (50g)",    category:"grain",    tags:["fermented","low fat","probiotic"], dietOk:["vegetarian","non-veg","vegan"] },
+  "dosa":            { cal:168, protein:3.8, carbs:24, fat:6,   fiber:1,   sugar:0,  sodium:280, serving:"1 plain dosa",    category:"grain",    tags:["fermented","probiotic","moderate fat"], dietOk:["vegetarian","non-veg","vegan"] },
+  "poha":            { cal:76,  protein:1.2, carbs:17, fat:0.1, fiber:0.2, sugar:0,  sodium:8,   serving:"100g cooked",     category:"grain",    tags:["light","easy digest","low fiber"], dietOk:["vegetarian","vegan"] },
+  "quinoa":          { cal:120, protein:4.4, carbs:22, fat:1.9, fiber:2.8, sugar:0.9,sodium:7,   serving:"100g cooked",     category:"grain",    tags:["complete protein","gluten-free","all amino acids"], dietOk:["all"] },
+  "pasta":           { cal:131, protein:5,   carbs:25, fat:1.1, fiber:1.8, sugar:0.6,sodium:6,   serving:"100g cooked",     category:"grain",    tags:["moderate GI","filling","high carb"], dietOk:["vegetarian","non-veg","vegan"] },
+  // Proteins
+  "chicken breast":  { cal:165, protein:31,  carbs:0,  fat:3.6, fiber:0,   sugar:0,  sodium:74,  serving:"100g cooked",     category:"protein",  tags:["lean protein","low fat","muscle building"], dietOk:["non-veg"] },
+  "egg":             { cal:68,  protein:5.5, carbs:0.6,fat:4.8, fiber:0,   sugar:0.6,sodium:62,  serving:"1 whole egg",     category:"protein",  tags:["complete protein","choline","versatile"], dietOk:["vegetarian","non-veg"] },
+  "paneer":          { cal:265, protein:18,  carbs:3.4,fat:20,  fiber:0,   sugar:0,  sodium:28,  serving:"100g",            category:"protein",  tags:["calcium","protein","high fat"], dietOk:["vegetarian"] },
+  "tofu":            { cal:76,  protein:8,   carbs:1.9,fat:4.8, fiber:0.3, sugar:0.7,sodium:7,   serving:"100g",            category:"protein",  tags:["plant protein","calcium","iron"], dietOk:["vegan","vegetarian"] },
+  "dal":             { cal:116, protein:9,   carbs:20, fat:0.4, fiber:7.9, sugar:1.8,sodium:6,   serving:"100g cooked",     category:"protein",  tags:["plant protein","fiber","iron"], dietOk:["vegan","vegetarian"] },
+  "fish":            { cal:136, protein:26,  carbs:0,  fat:3,   fiber:0,   sugar:0,  sodium:75,  serving:"100g cooked",     category:"protein",  tags:["omega-3","lean protein","heart-healthy"], dietOk:["non-veg"] },
+  "salmon":          { cal:208, protein:20,  carbs:0,  fat:13,  fiber:0,   sugar:0,  sodium:59,  serving:"100g cooked",     category:"protein",  tags:["omega-3","healthy fat","anti-inflammatory"], dietOk:["non-veg"] },
+  "mutton":          { cal:294, protein:25,  carbs:0,  fat:21,  fiber:0,   sugar:0,  sodium:72,  serving:"100g cooked",     category:"protein",  tags:["high protein","high fat","iron"], dietOk:["non-veg"] },
+  "rajma":           { cal:127, protein:8.7, carbs:23, fat:0.5, fiber:6.4, sugar:0.3,sodium:2,   serving:"100g cooked",     category:"protein",  tags:["fiber","plant protein","low GI"], dietOk:["vegan","vegetarian"] },
+  "chickpeas":       { cal:164, protein:8.9, carbs:27, fat:2.6, fiber:7.6, sugar:4.8,sodium:24,  serving:"100g cooked",     category:"protein",  tags:["fiber","plant protein","iron"], dietOk:["vegan","vegetarian"] },
+  // Dairy
+  "milk":            { cal:61,  protein:3.2, carbs:4.8,fat:3.3, fiber:0,   sugar:5.1,sodium:43,  serving:"100ml",           category:"dairy",    tags:["calcium","protein","vitamin D"], dietOk:["vegetarian","non-veg"] },
+  "curd":            { cal:98,  protein:11,  carbs:3.4,fat:4.3, fiber:0,   sugar:3.4,sodium:46,  serving:"100g",            category:"dairy",    tags:["probiotics","calcium","protein"], dietOk:["vegetarian","non-veg"] },
+  "yogurt":          { cal:59,  protein:3.5, carbs:4.7,fat:3.3, fiber:0,   sugar:4.7,sodium:36,  serving:"100g",            category:"dairy",    tags:["probiotics","calcium","gut health"], dietOk:["vegetarian","non-veg"] },
+  "cheese":          { cal:402, protein:25,  carbs:1.3,fat:33,  fiber:0,   sugar:0.5,sodium:621, serving:"100g",            category:"dairy",    tags:["calcium","high fat","high sodium"], dietOk:["vegetarian","non-veg"] },
+  "butter":          { cal:717, protein:0.9, carbs:0.1,fat:81,  fiber:0,   sugar:0.1,sodium:576, serving:"100g",            category:"dairy",    tags:["saturated fat","very high calorie","high sodium"], dietOk:["vegetarian","non-veg"] },
+  // Snacks & Fast Food
+  "samosa":          { cal:262, protein:4.1, carbs:30, fat:14,  fiber:2.1, sugar:1,  sodium:320, serving:"1 piece (100g)",  category:"snack",    tags:["fried","high carb","moderate protein"], dietOk:["vegetarian","non-veg"] },
+  "pizza slice":     { cal:272, protein:11,  carbs:33, fat:10,  fiber:2.3, sugar:3.6,sodium:551, serving:"1 slice (107g)", category:"fastfood", tags:["high sodium","high carb","processed"], dietOk:["vegetarian","non-veg"] },
+  "burger":          { cal:295, protein:17,  carbs:24, fat:14,  fiber:1.3, sugar:5,  sodium:497, serving:"1 burger",       category:"fastfood", tags:["high sodium","high fat","processed"], dietOk:["non-veg"] },
+  "french fries":    { cal:312, protein:3.4, carbs:41, fat:15,  fiber:3.8, sugar:0.3,sodium:210, serving:"medium (117g)",  category:"fastfood", tags:["fried","high carb","trans fat"], dietOk:["vegan","vegetarian","non-veg"] },
+  "chips":           { cal:536, protein:7,   carbs:53, fat:34,  fiber:4.8, sugar:0.3,sodium:525, serving:"100g",           category:"snack",    tags:["ultra-processed","high fat","high sodium"], dietOk:["vegan","vegetarian","non-veg"] },
+  "biscuits":        { cal:422, protein:6.7, carbs:68, fat:14,  fiber:2,   sugar:25, sodium:395, serving:"100g",           category:"snack",    tags:["refined sugar","processed","low nutrition"], dietOk:["all"] },
+  "chocolate":       { cal:546, protein:4.9, carbs:60, fat:31,  fiber:7,   sugar:48, sodium:24,  serving:"100g",           category:"snack",    tags:["high sugar","high fat","mood booster"], dietOk:["all"] },
+  "nuts":            { cal:607, protein:20,  carbs:21, fat:54,  fiber:7,   sugar:4,  sodium:2,   serving:"100g",           category:"snack",    tags:["healthy fat","protein","heart-healthy"], dietOk:["all"] },
+  "almonds":         { cal:579, protein:21,  carbs:22, fat:50,  fiber:12,  sugar:4,  sodium:1,   serving:"100g",           category:"snack",    tags:["vitamin E","healthy fat","fiber"], dietOk:["all"] },
+  "peanut butter":   { cal:588, protein:25,  carbs:20, fat:50,  fiber:6,   sugar:9,  sodium:425, serving:"100g (2 tbsp=32g)",category:"snack",  tags:["protein","healthy fat","high calorie"], dietOk:["all"] },
+  // Beverages
+  "water":           { cal:0,   protein:0,   carbs:0,  fat:0,   fiber:0,   sugar:0,  sodium:0,   serving:"250ml (1 cup)",   category:"drink",   tags:["zero cal","essential","hydrating"], dietOk:["all"] },
+  "chai tea":        { cal:60,  protein:1.8, carbs:9,  fat:1.8, fiber:0,   sugar:8,  sodium:20,  serving:"1 cup (250ml)",   category:"drink",   tags:["sugar varies","caffeinated","comforting"], dietOk:["vegetarian","non-veg"] },
+  "black coffee":    { cal:2,   protein:0.3, carbs:0,  fat:0,   fiber:0,   sugar:0,  sodium:5,   serving:"1 cup (240ml)",   category:"drink",   tags:["zero cal","caffeine","antioxidants"], dietOk:["all"] },
+  "coffee with milk":{ cal:55,  protein:1.8, carbs:5,  fat:3,   fiber:0,   sugar:5,  sodium:30,  serving:"1 cup (240ml)",   category:"drink",   tags:["caffeine","calcium","moderate cal"], dietOk:["vegetarian","non-veg"] },
+  "orange juice":    { cal:112, protein:1.7, carbs:26, fat:0.5, fiber:0.5, sugar:21, sodium:2,   serving:"1 cup (248ml)",   category:"drink",   tags:["high sugar","vitamin C","liquid calories"], dietOk:["all"] },
+  "cola":            { cal:140, protein:0,   carbs:39, fat:0,   fiber:0,   sugar:39, sodium:45,  serving:"1 can (355ml)",   category:"drink",   tags:["empty calories","high sugar","no nutrition"], dietOk:["all"] },
+  "coconut water":   { cal:46,  protein:1.7, carbs:8.9,fat:0.5, fiber:2.6, sugar:6,  sodium:252, serving:"1 cup (240ml)",   category:"drink",   tags:["electrolytes","hydrating","natural"], dietOk:["all"] },
+  "green tea":       { cal:2,   protein:0,   carbs:0,  fat:0,   fiber:0,   sugar:0,  sodium:0,   serving:"1 cup (240ml)",   category:"drink",   tags:["antioxidants","metabolism boost","zero cal"], dietOk:["all"] },
+  "lassi":           { cal:150, protein:5,   carbs:18, fat:6,   fiber:0,   sugar:18, sodium:80,  serving:"1 glass (250ml)", category:"drink",   tags:["probiotics","calcium","moderate sugar"], dietOk:["vegetarian","non-veg"] },
+  "protein shake":   { cal:120, protein:24,  carbs:5,  fat:2,   fiber:1,   sugar:3,  sodium:150, serving:"1 scoop (240ml)", category:"drink",   tags:["high protein","muscle recovery","convenient"], dietOk:["all"] },
+  "alcohol":         { cal:215, protein:0,   carbs:7,  fat:0,   fiber:0,   sugar:6,  sodium:10,  serving:"1 drink",         category:"drink",   tags:["empty calories","liver impact","no nutrition"], dietOk:["all"] },
+  "beer":            { cal:154, protein:1.6, carbs:13, fat:0,   fiber:0,   sugar:0,  sodium:14,  serving:"1 can (355ml)",   category:"drink",   tags:["empty calories","liquid carbs","bloating"], dietOk:["all"] },
+  "whole milk":      { cal:61,  protein:3.2, carbs:4.8,fat:3.3, fiber:0,   sugar:5.1,sodium:43,  serving:"100ml",           category:"drink",   tags:["calcium","protein","natural"], dietOk:["vegetarian","non-veg"] },
+  // Indian Foods
+  "biryani":         { cal:290, protein:9,   carbs:42, fat:10,  fiber:1.5, sugar:2,  sodium:560, serving:"1 cup (200g)",    category:"meal",    tags:["high cal","mixed spices","complete meal"], dietOk:["non-veg","vegetarian"] },
+  "dal tadka":       { cal:128, protein:8,   carbs:18, fat:3.5, fiber:5,   sugar:1,  sodium:340, serving:"1 cup (200g)",    category:"meal",    tags:["plant protein","fiber","iron"], dietOk:["vegan","vegetarian"] },
+  "butter chicken":  { cal:170, protein:15,  carbs:5,  fat:10,  fiber:1,   sugar:4,  sodium:480, serving:"100g",            category:"meal",    tags:["high fat","protein","high sodium"], dietOk:["non-veg"] },
+  "aloo paratha":    { cal:300, protein:6,   carbs:40, fat:13,  fiber:2,   sugar:1,  sodium:350, serving:"1 piece (120g)",  category:"meal",    tags:["high carb","moderate fat","filling"], dietOk:["vegetarian"] },
+  "upma":            { cal:150, protein:3.5, carbs:25, fat:4.5, fiber:2,   sugar:1,  sodium:280, serving:"1 cup (200g)",    category:"meal",    tags:["semolina","moderate GI","filling"], dietOk:["vegetarian","vegan"] },
+  "chole":           { cal:164, protein:9,   carbs:27, fat:3,   fiber:7,   sugar:5,  sodium:420, serving:"1 cup (200g)",    category:"meal",    tags:["plant protein","high fiber","iron"], dietOk:["vegan","vegetarian"] },
+  "khichdi":         { cal:120, protein:5,   carbs:22, fat:2,   fiber:3,   sugar:0.5,sodium:180, serving:"1 cup (200g)",    category:"meal",    tags:["easy digest","balanced","comforting"], dietOk:["vegan","vegetarian"] },
+  "pav bhaji":       { cal:280, protein:6,   carbs:40, fat:10,  fiber:3.5, sugar:5,  sodium:510, serving:"1 serving",       category:"meal",    tags:["high sodium","high carb","street food"], dietOk:["vegetarian"] },
+  "vada pav":        { cal:290, protein:6,   carbs:42, fat:11,  fiber:2,   sugar:3,  sodium:480, serving:"1 piece",         category:"fastfood",tags:["high carb","fried","street food"], dietOk:["vegetarian","vegan"] },
+  "puri":            { cal:120, protein:2.2, carbs:15, fat:5.5, fiber:0.8, sugar:0.2,sodium:120, serving:"1 puri (30g)",    category:"snack",   tags:["fried","high carb","refined flour"], dietOk:["vegetarian","vegan"] },
+  "dhokla":          { cal:76,  protein:3.8, carbs:12, fat:1.8, fiber:1.5, sugar:2,  sodium:200, serving:"2 pieces (100g)", category:"snack",   tags:["fermented","steamed","low fat"], dietOk:["vegetarian","vegan"] },
+  // Sweets
+  "gulab jamun":     { cal:175, protein:2,   carbs:28, fat:6,   fiber:0.5, sugar:22, sodium:90,  serving:"1 piece (60g)",   category:"sweet",   tags:["very high sugar","fried","dessert"], dietOk:["vegetarian"] },
+  "jalebi":          { cal:150, protein:1,   carbs:28, fat:4,   fiber:0,   sugar:20, sodium:30,  serving:"2 pieces (60g)",  category:"sweet",   tags:["very high sugar","fried","empty calories"], dietOk:["vegetarian","vegan"] },
+  "ice cream":       { cal:207, protein:3.5, carbs:24, fat:11,  fiber:0.7, sugar:21, sodium:80,  serving:"1 scoop (100g)",  category:"sweet",   tags:["high sugar","saturated fat","treat"], dietOk:["vegetarian","non-veg"] },
+  "halwa":           { cal:280, protein:4,   carbs:38, fat:12,  fiber:1.5, sugar:22, sodium:60,  serving:"100g",            category:"sweet",   tags:["high sugar","high fat","occasional treat"], dietOk:["vegetarian"] },
+};
+
+// Aliases for fuzzy matching
+const ALIASES = {
+  "chai":"chai tea","tea":"chai tea","green tea":"green tea","coffee":"coffee with milk",
+  "black coffee":"black coffee","rice":"white rice","roti":"chapati","curd":"curd",
+  "yoghurt":"yogurt","dahi":"curd","paneer":"paneer","lentils":"dal","lentil":"dal",
+  "kidney beans":"rajma","red beans":"rajma","chickpea":"chickpeas","chana":"chickpeas",
+  "chole bhature":"chole","soda":"cola","pepsi":"cola","coke":"cola","sprite":"cola",
+  "fries":"french fries","potato fries":"french fries","crisp":"chips","crisps":"chips",
+  "popcorn":"chips","nut":"nuts","mixed nuts":"nuts","eggs":"egg","boiled egg":"egg",
+  "chicken":"chicken breast","fish curry":"fish","milk tea":"chai tea",
+  "lassi":"lassi","buttermilk":"lassi","sweet lassi":"lassi",
+  "peanuts":"nuts","groundnuts":"nuts","walnut":"nuts","cashew":"nuts",
+  "semolina":"upma","rava":"upma","suji":"upma","suji upma":"upma",
+  "lemonade":"orange juice","fruit juice":"orange juice","juice":"orange juice",
+  "protein powder":"protein shake","whey":"protein shake",
+  "wine":"alcohol","whiskey":"alcohol","rum":"alcohol","vodka":"alcohol",
+  "bread":"white bread","toast":"white bread","sandwich bread":"white bread",
+  "dark chocolate":"chocolate","milk chocolate":"chocolate",
+  "moong dal":"dal","masoor dal":"dal","toor dal":"dal","chana dal":"dal",
+};
+
+// Quick preset foods to show
+const FA_PRESETS = [
+  "banana","oats","egg","chai tea","brown rice","dal","samosa","water",
+  "chicken breast","paneer","green tea","orange juice","almonds","cola","biryani","curd"
+];
+
+let faHistory = [];
+let faCurrentPlan = null; // will be populated from window.currentPlan
+
+function getFaProfile() {
+  // Try to read from the app's generated plan stored globally
+  const p = window.currentPlan || {};
+  return {
+    goal:       p.goal || null,
+    diet:       p.diet || null,
+    targetCal:  p.targetCal || null,
+    conditions: p.conditions || [],
+    age:        p.age || null,
+    gender:     p.gender || null,
+    weight:     p.weight || null,
+  };
+}
+
+function updateFaProfileStrip() {
+  const p = getFaProfile();
+  const strip = document.getElementById('fa-strip-noprofile');
+  const goalEl = document.getElementById('fa-strip-goal');
+  const dietEl = document.getElementById('fa-strip-diet');
+  const calEl  = document.getElementById('fa-strip-cal');
+  const condEl = document.getElementById('fa-strip-cond');
+
+  if (!p.goal) {
+    if (strip) strip.style.display = 'inline';
+    [goalEl, dietEl, calEl, condEl].forEach(el => { if(el) el.style.display = 'none'; });
+    return;
+  }
+  if (strip) strip.style.display = 'none';
+  const goalMap = { lose:'⬇️ Lose Weight', gain:'💪 Gain Muscle', maintain:'⚖️ Maintain', fitness:'🌿 Fitness' };
+  const dietMap = { vegetarian:'🌱 Vegetarian', vegan:'🌿 Vegan', 'non-veg':'🍗 Non-Vegetarian', keto:'🥑 Keto' };
+  if (goalEl) { goalEl.style.display = 'inline-block'; goalEl.textContent = 'Goal: ' + (goalMap[p.goal] || p.goal); }
+  if (dietEl) { dietEl.style.display = 'inline-block'; dietEl.textContent = 'Diet: ' + (dietMap[p.diet] || p.diet || 'Any'); }
+  if (calEl)  { calEl.style.display  = 'inline-block'; calEl.textContent  = 'Daily Cal: ' + (p.targetCal ? p.targetCal + ' kcal' : '—'); }
+  if (p.conditions && p.conditions.length) {
+    condEl.style.display = 'inline-block';
+    condEl.textContent = '⚠️ ' + p.conditions.join(', ');
+  } else {
+    condEl.style.display = 'none';
+  }
+}
+
+function findFood(query) {
+  const q = query.trim().toLowerCase();
+  if (FOOD_DB[q]) return { key: q, data: FOOD_DB[q] };
+  if (ALIASES[q] && FOOD_DB[ALIASES[q]]) return { key: ALIASES[q], data: FOOD_DB[ALIASES[q]] };
+  // partial match
+  for (const key of Object.keys(FOOD_DB)) {
+    if (key.includes(q) || q.includes(key)) return { key, data: FOOD_DB[key] };
+  }
+  for (const [alias, target] of Object.entries(ALIASES)) {
+    if (alias.includes(q) || q.includes(alias)) {
+      if (FOOD_DB[target]) return { key: target, data: FOOD_DB[target] };
+    }
+  }
+  return null;
+}
+
+function getVerdict(food, profile) {
+  const { goal, diet, conditions, targetCal } = profile;
+  const f = food.data;
+  const reasons = [];
+  let score = 0; // higher = better
+
+  // Diet compatibility
+  if (diet && diet !== 'any') {
+    const compatible = f.dietOk.includes('all') || f.dietOk.includes(diet);
+    if (!compatible) {
+      return {
+        verdict: 'avoid',
+        icon: '🚫',
+        label: 'Not Suitable',
+        reason: `This food doesn't match your ${diet} diet preference.`,
+        tips: [{ type: 'alert', text: `You follow a ${diet} diet. This item is not compatible.` }]
+      };
+    }
+  }
+
+  const tips = [];
+
+  // Calorie assessment
+  if (targetCal) {
+    const pct = Math.round((f.cal / targetCal) * 100);
+    if (f.cal === 0) {
+      score += 3;
+      tips.push({ type: 'good', text: `✅ Zero calories — perfect for hydration without affecting your ${targetCal} kcal daily target.` });
+    } else if (pct <= 10) {
+      score += 2;
+      tips.push({ type: 'good', text: `✅ Only ${pct}% of your daily ${targetCal} kcal target — fits well in your budget.` });
+    } else if (pct <= 20) {
+      score += 1;
+      tips.push({ type: 'good', text: `ℹ️ ${f.cal} kcal is ${pct}% of your daily ${targetCal} kcal target — manageable.` });
+    } else if (pct <= 35) {
+      score -= 1;
+      tips.push({ type: 'warn', text: `⚠️ ${f.cal} kcal is ${pct}% of your daily ${targetCal} kcal budget — eat mindfully.` });
+    } else {
+      score -= 2;
+      tips.push({ type: 'alert', text: `🚨 ${f.cal} kcal is ${pct}% of your daily ${targetCal} kcal budget — very high portion of your daily calories.` });
+    }
+  }
+
+  // Goal-based logic
+  if (goal === 'lose') {
+    if (f.cal > 300) { score -= 2; tips.push({ type: 'warn', text: `⚠️ High calorie food (${f.cal} kcal). For weight loss, opt for smaller portions or lighter alternatives.` }); }
+    if (f.fiber >= 3) { score += 1; tips.push({ type: 'good', text: `✅ Good fiber content (${f.fiber}g) — helps you feel full and supports weight loss.` }); }
+    if (f.protein >= 15) { score += 1; tips.push({ type: 'good', text: `✅ High protein (${f.protein}g) — helps preserve muscle while losing weight.` }); }
+    if (f.sugar > 15) { score -= 1; tips.push({ type: 'warn', text: `⚠️ Contains ${f.sugar}g sugar — can spike insulin and hinder fat loss.` }); }
+  }
+  if (goal === 'gain') {
+    if (f.cal >= 200) { score += 1; tips.push({ type: 'good', text: `✅ Calorie-dense (${f.cal} kcal) — supports a caloric surplus for muscle building.` }); }
+    if (f.protein >= 15) { score += 2; tips.push({ type: 'good', text: `✅ High protein (${f.protein}g) — excellent for muscle repair and growth.` }); }
+    if (f.protein < 5 && f.cal < 100) { score -= 1; tips.push({ type: 'warn', text: `ℹ️ Low protein and calorie content. For muscle gain, pair with a protein source.` }); }
+  }
+  if (goal === 'maintain') {
+    if (f.cal > 400) { score -= 1; tips.push({ type: 'warn', text: `⚠️ High calorie item. OK occasionally but mind portion size to maintain weight.` }); }
+  }
+  if (goal === 'fitness') {
+    if (f.fiber >= 2) score += 1;
+    if (f.protein >= 10) score += 1;
+    if (f.category === 'vegetable' || f.category === 'fruit') { score += 1; tips.push({ type: 'good', text: `✅ Whole food — great for general fitness and wellness.` }); }
+  }
+
+  // Condition-based warnings
+  if (conditions.includes('diabetes')) {
+    if (f.sugar > 10) { score -= 2; tips.push({ type: 'alert', text: `🩸 Diabetes alert: Contains ${f.sugar}g sugar — can spike blood glucose. Choose low-GI alternatives.` }); }
+    else if (f.sugar <= 3) { score += 1; tips.push({ type: 'good', text: `✅ Low sugar (${f.sugar}g) — suitable for blood sugar management.` }); }
+    if (f.fiber >= 4) { score += 1; tips.push({ type: 'good', text: `✅ High fiber (${f.fiber}g) — slows glucose absorption, beneficial for diabetes.` }); }
+    if (['cola','orange juice','jalebi','gulab jamun','chocolate'].includes(food.key)) { score -= 3; }
+  }
+  if (conditions.includes('hypertension')) {
+    if (f.sodium > 400) { score -= 2; tips.push({ type: 'alert', text: `❤️ Hypertension alert: Very high sodium (${f.sodium}mg). Daily limit is <1500mg for hypertension.` }); }
+    else if (f.sodium > 200) { score -= 1; tips.push({ type: 'warn', text: `⚠️ Moderate sodium (${f.sodium}mg). Watch total daily sodium if you have hypertension.` }); }
+    else { score += 1; tips.push({ type: 'good', text: `✅ Low sodium (${f.sodium}mg) — safe for blood pressure management.` }); }
+  }
+  if (conditions.includes('heart')) {
+    if (f.fat > 20 && !food.key.includes('almond') && !food.key.includes('nut')) { score -= 2; tips.push({ type: 'alert', text: `💙 Heart health: High fat content (${f.fat}g). Prefer unsaturated fats like olive oil, nuts, fish.` }); }
+    if (food.key === 'salmon' || food.key === 'fish') { score += 2; tips.push({ type: 'good', text: `💙 Excellent for heart health — rich in omega-3 fatty acids that reduce inflammation.` }); }
+    if (f.sodium > 300) { score -= 1; }
+  }
+  if (conditions.includes('thyroid')) {
+    if (['cabbage','broccoli','cauliflower'].some(g => food.key.includes(g))) {
+      tips.push({ type: 'warn', text: `🦋 Thyroid note: Cruciferous vegetables can interfere with thyroid absorption if eaten raw in large amounts. Cooking reduces this effect.` });
+    }
+  }
+  if (conditions.includes('pcos')) {
+    if (f.sugar > 10) { score -= 1; tips.push({ type: 'warn', text: `🌸 PCOS note: High sugar (${f.sugar}g) can worsen insulin resistance. Prefer low-GI foods.` }); }
+    if (f.fiber >= 4) { score += 1; tips.push({ type: 'good', text: `✅ High fiber (${f.fiber}g) supports hormonal balance — beneficial for PCOS.` }); }
+  }
+
+  // Category-specific tips
+  if (f.category === 'drink' && f.cal > 100) tips.push({ type: 'warn', text: `⚠️ Liquid calories don't trigger fullness the same way solid food does. Be mindful.` });
+  if (f.category === 'fastfood') tips.push({ type: 'warn', text: `⚠️ Processed food — limit to occasional treats and watch sodium/fat content.` });
+  if (f.category === 'sweet') tips.push({ type: 'warn', text: `⚠️ High sugar dessert — enjoy as a small occasional treat, not daily.` });
+  if (f.category === 'vegetable') { score += 1; }
+  if (f.category === 'fruit' && goal === 'lose' && f.sugar > 12) tips.push({ type: 'warn', text: `⚠️ Fruits are healthy but high-sugar fruits can slow weight loss. Prefer berries, guava, papaya.` });
+
+  // Keto
+  if (diet === 'keto') {
+    if (f.carbs > 20) { score -= 2; tips.push({ type: 'alert', text: `🥑 Keto alert: ${f.carbs}g carbs — too high for ketogenic diet (aim <20g net carbs/day).` }); }
+    else if (f.carbs <= 5) { score += 2; tips.push({ type: 'good', text: `✅ Low carb (${f.carbs}g) — fits keto diet perfectly.` }); }
+  }
+
+  // Alcohol
+  if (food.key === 'alcohol' || food.key === 'beer') {
+    score -= 3;
+    tips.push({ type: 'alert', text: `🚨 Alcohol provides empty calories with no nutritional value and can harm liver health, sleep quality, and weight management.` });
+    if (conditions.includes('diabetes')) tips.push({ type: 'alert', text: `🩸 Diabetes + alcohol: Can cause dangerous blood sugar fluctuations.` });
+  }
+
+  // Determine final verdict
+  let verdict, icon, label, reason;
+  if (score >= 2) {
+    verdict = 'eat'; icon = '✅'; label = 'Great Choice!';
+    reason = `This food aligns well with your ${goal ? goal + ' goal' : 'profile'} and dietary needs.`;
+  } else if (score >= 0) {
+    verdict = 'eat'; icon = '👍'; label = 'Good to Eat';
+    reason = `Suitable for your profile. Enjoy in reasonable portions.`;
+  } else if (score >= -1) {
+    verdict = 'limit'; icon = '⚠️'; label = 'Eat in Moderation';
+    reason = `OK occasionally but mind the portion size given your health goals.`;
+  } else if (score >= -2) {
+    verdict = 'limit'; icon = '😐'; label = 'Limit This';
+    reason = `Has some concerns for your health profile. Keep portions small and infrequent.`;
+  } else {
+    verdict = 'avoid'; icon = '❌'; label = 'Best to Avoid';
+    reason = `This food has multiple flags against your current health goals or conditions.`;
+  }
+
+  return { verdict, icon, label, reason, tips };
+}
+
+function renderResult(food, profile) {
+  const f = food.data;
+  const v = getVerdict(food, profile);
+  const key = food.key;
+  const name = key.charAt(0).toUpperCase() + key.slice(1);
+
+  // Calorie bar vs daily target
+  let calBarHtml = '';
+  if (profile.targetCal && f.cal > 0) {
+    const pct = Math.min(100, Math.round((f.cal / profile.targetCal) * 100));
+    const barCol = pct > 35 ? 'var(--soft-red)' : pct > 20 ? 'var(--gold)' : 'var(--sage)';
+    calBarHtml = `
+      <div class="fa-cal-bar-wrap">
+        <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;">
+          Calorie impact — ${f.cal} kcal out of your ${profile.targetCal} kcal daily target (${pct}%)
+        </div>
+        <div class="fa-cal-bar-track">
+          <div class="fa-cal-bar-fill" style="width:${pct}%;background:${barCol};"></div>
+        </div>
+      </div>`;
+  }
+
+  const tagsHtml = f.tags.map(t => `<span class="fa-tag fa-tag-good">${t}</span>`).join('');
+  const tipsHtml = v.tips.map(t =>
+    `<div class="fa-tip ${t.type === 'alert' ? 'alert' : t.type === 'warn' ? 'warn' : ''}">${t.text}</div>`
+  ).join('');
+
+  const r = document.getElementById('fa-result');
+  r.style.display = 'block';
+  r.innerHTML = `
+    <div class="fa-result-card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+        <div style="font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:700;">${name}</div>
+        <span style="font-size:13px;color:var(--text-muted);background:var(--bg2);padding:3px 12px;border-radius:20px;">${f.serving}</span>
+        <span style="font-size:12px;color:var(--text-muted);background:var(--bg2);padding:3px 12px;border-radius:20px;text-transform:capitalize;">${f.category}</span>
+      </div>
+
+      <!-- Verdict Banner -->
+      <div class="fa-verdict ${v.verdict}">
+        <div class="fa-verdict-icon">${v.icon}</div>
+        <div>
+          <div class="fa-verdict-label">${v.label}</div>
+          <div class="fa-verdict-reason">${v.reason}</div>
+        </div>
+      </div>
+
+      <!-- Macros -->
+      <div class="fa-macro-row">
+        <div class="fa-macro-box">
+          <div class="fa-macro-val">${f.cal}</div>
+          <div class="fa-macro-unit">kcal</div>
+          <div class="fa-macro-lbl">Calories</div>
+        </div>
+        <div class="fa-macro-box">
+          <div class="fa-macro-val">${f.protein}</div>
+          <div class="fa-macro-unit">g</div>
+          <div class="fa-macro-lbl">Protein</div>
+        </div>
+        <div class="fa-macro-box">
+          <div class="fa-macro-val">${f.carbs}</div>
+          <div class="fa-macro-unit">g</div>
+          <div class="fa-macro-lbl">Carbs</div>
+        </div>
+        <div class="fa-macro-box">
+          <div class="fa-macro-val">${f.fat}</div>
+          <div class="fa-macro-unit">g</div>
+          <div class="fa-macro-lbl">Fat</div>
+        </div>
+        <div class="fa-macro-box">
+          <div class="fa-macro-val">${f.fiber}</div>
+          <div class="fa-macro-unit">g</div>
+          <div class="fa-macro-lbl">Fiber</div>
+        </div>
+        <div class="fa-macro-box">
+          <div class="fa-macro-val">${f.sugar}</div>
+          <div class="fa-macro-unit">g</div>
+          <div class="fa-macro-lbl">Sugar</div>
+        </div>
+        <div class="fa-macro-box">
+          <div class="fa-macro-val">${f.sodium}</div>
+          <div class="fa-macro-unit">mg</div>
+          <div class="fa-macro-lbl">Sodium</div>
+        </div>
+      </div>
+
+      ${calBarHtml}
+
+      <!-- Tags -->
+      <div style="margin-bottom:16px;">${tagsHtml}</div>
+
+      <!-- Personalised Tips -->
+      ${v.tips.length ? `<div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-muted);margin-bottom:10px;">Personalised Analysis</div>${tipsHtml}` : ''}
+
+      ${!profile.goal ? `<div class="fa-tip warn" style="margin-top:12px;">⚠️ <span>Set up your profile to get personalised eat/avoid recommendations based on your goals and health conditions. <button onclick="showPage('profile')" style="background:none;border:none;color:var(--sage-dark);font-weight:700;cursor:pointer;text-decoration:underline;">Set up →</button></span></div>` : ''}
+    </div>`;
+}
+
+function advisorSearch() {
+  const input = document.getElementById('fa-input');
+  const query = input.value.trim();
+  if (!query) return;
+
+  document.getElementById('fa-suggestions').style.display = 'none';
+  updateFaProfileStrip();
+
+  const found = findFood(query);
+  const profile = getFaProfile();
+
+  if (!found) {
+    document.getElementById('fa-result').style.display = 'block';
+    document.getElementById('fa-result').innerHTML = `
+      <div class="fa-result-card" style="text-align:center;padding:40px;">
+        <div style="font-size:48px;margin-bottom:12px;">🔍</div>
+        <div style="font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;margin-bottom:8px;">Food not found</div>
+        <div style="color:var(--text-muted);font-size:14px;margin-bottom:16px;">
+          "<strong>${query}</strong>" isn't in our database yet.<br>
+          Try searching common names like: banana, oats, chicken breast, samosa, chai tea
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;">
+          ${['banana','oats','dal','chicken breast','chai tea','rice','egg','almonds'].map(f =>
+            `<span onclick="document.getElementById('fa-input').value='${f}';advisorSearch()" class="fa-history-chip" style="cursor:pointer;">${f}</span>`
+          ).join('')}
+        </div>
+      </div>`;
+    return;
+  }
+
+  renderResult(found, profile);
+
+  // Add to history
+  if (!faHistory.find(h => h.key === found.key)) {
+    faHistory.unshift({ key: found.key, name: found.key.charAt(0).toUpperCase() + found.key.slice(1), cal: found.data.cal });
+    if (faHistory.length > 12) faHistory.pop();
+  }
+  renderFaHistory();
+}
+
+function showFaSuggestions(val) {
+  const box = document.getElementById('fa-suggestions');
+  if (!val || val.length < 2) { box.style.display = 'none'; return; }
+  const q = val.toLowerCase();
+  const matches = [];
+  for (const key of Object.keys(FOOD_DB)) {
+    if (key.includes(q)) matches.push(key);
+    if (matches.length >= 6) break;
+  }
+  for (const [alias, target] of Object.entries(ALIASES)) {
+    if (alias.includes(q) && !matches.includes(target)) matches.push(target);
+    if (matches.length >= 6) break;
+  }
+  if (!matches.length) { box.style.display = 'none'; return; }
+  box.innerHTML = matches.map(m => {
+    const d = FOOD_DB[m];
+    return `<div class="fa-suggestion-item" onclick="document.getElementById('fa-input').value='${m}';advisorSearch()">
+      <span style="font-size:18px;">${d.category === 'fruit' ? '🍎' : d.category === 'vegetable' ? '🥦' : d.category === 'drink' ? '☕' : d.category === 'protein' ? '🥩' : d.category === 'grain' ? '🌾' : d.category === 'snack' ? '🍿' : d.category === 'dairy' ? '🥛' : d.category === 'meal' ? '🍱' : d.category === 'sweet' ? '🍬' : '🍽'}</span>
+      <span style="flex:1;font-weight:500;text-transform:capitalize;">${m}</span>
+      <span style="font-size:12px;color:var(--text-muted);">${d.cal} kcal · ${d.serving}</span>
+    </div>`;
+  }).join('');
+  box.style.display = 'block';
+}
+
+function renderFaHistory() {
+  const sec = document.getElementById('fa-history-section');
+  const list = document.getElementById('fa-history-list');
+  if (!faHistory.length) { sec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  list.innerHTML = faHistory.map(h =>
+    `<div class="fa-history-chip" onclick="document.getElementById('fa-input').value='${h.key}';advisorSearch()">
+      <span>${h.name}</span>
+      <span style="font-size:11px;color:var(--text-muted);">${h.cal} kcal</span>
+    </div>`
+  ).join('');
+}
+
+function clearFaHistory() { faHistory = []; renderFaHistory(); }
+
+function initFaPresets() {
+  const el = document.getElementById('fa-presets');
+  if (!el) return;
+  const icons = { fruit:'🍎', vegetable:'🥦', drink:'☕', protein:'🥩', grain:'🌾', snack:'🍿', dairy:'🥛', meal:'🍱', sweet:'🍬', fastfood:'🍔' };
+  el.innerHTML = FA_PRESETS.map(key => {
+    const d = FOOD_DB[key];
+    if (!d) return '';
+    return `<span class="preset-chip" onclick="document.getElementById('fa-input').value='${key}';advisorSearch()">
+      ${icons[d.category] || '🍽'} ${key.charAt(0).toUpperCase() + key.slice(1)}
+      <span style="color:var(--text-muted);font-size:11px;">${d.cal} kcal</span>
+    </span>`;
+  }).join('');
+}
+
+// Close suggestions on outside click
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('#fa-input') && !e.target.closest('#fa-suggestions')) {
+    const box = document.getElementById('fa-suggestions');
+    if (box) box.style.display = 'none';
+  }
+});
+
+// Hook into showPage to refresh profile strip when Food Advisor is opened
+const _origShowPage = window.showPage;
+window.showPage = function(page) {
+  if (_origShowPage) _origShowPage(page);
+  if (page === 'foodadvisor') {
+    updateFaProfileStrip();
+    initFaPresets();
+  }
+};
+
+// Also expose so generatePlan can update it
+window.updateFaProfileStrip = updateFaProfileStrip;
+</script>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
