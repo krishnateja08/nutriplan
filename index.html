@@ -914,13 +914,45 @@ footer { text-align: center; padding: 24px; font-size: 12px; color: var(--text-m
 .food-card-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
 .food-card-title { font-family:'Cormorant Garamond',serif; font-size:18px; font-weight:600; }
 .food-card-sub { font-size:11px; color:var(--text-muted); margin-top:2px; }
-.food-item { display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px solid var(--border); }
-.food-item:last-child { border-bottom:none; }
-.food-item-emoji { font-size:20px; flex-shrink:0; width:28px; text-align:center; }
-.food-item-body { flex:1; min-width:0; }
-.food-item-name { font-size:14px; font-weight:600; color:var(--charcoal); }
-.food-item-reason { font-size:12px; color:var(--text-muted); margin-top:2px; line-height:1.4; }
-.food-item-tag { display:inline-block; font-size:10px; font-weight:700; padding:2px 8px; border-radius:20px; margin-top:4px; letter-spacing:0.04em; }
+/* ---- Compact food chip widget ---- */
+.food-cat-block { margin-bottom: 14px; }
+.food-cat-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.09em; margin-bottom:7px; display:flex; align-items:center; gap:5px; }
+.food-chips { display:flex; flex-wrap:wrap; gap:6px; }
+.food-chip {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:5px 11px; border-radius:20px; font-size:12px; font-weight:600;
+  cursor:pointer; border:1.5px solid transparent;
+  transition:all 0.18s; position:relative; user-select:none;
+}
+.food-chip.chip-avoid  { background:rgba(212,100,90,0.10); border-color:rgba(212,100,90,0.3); color:var(--soft-red); }
+.food-chip.chip-limit  { background:rgba(201,168,76,0.10); border-color:rgba(201,168,76,0.3); color:#8a6a00; }
+.food-chip.chip-eat    { background:rgba(122,158,126,0.12); border-color:rgba(122,158,126,0.35); color:var(--sage-dark); }
+.food-chip.chip-priority { background:rgba(77,115,82,0.16); border-color:var(--sage); color:var(--sage-dark); }
+.food-chip:hover { transform:translateY(-1px); box-shadow:0 3px 10px rgba(0,0,0,0.1); }
+.food-chip.active { box-shadow:0 0 0 2px currentColor; }
+
+/* Expandable detail panel */
+.food-chip-detail {
+  display:none; grid-column:1/-1;
+  background:var(--bg2); border-radius:12px; padding:12px 14px;
+  font-size:13px; line-height:1.5; color:var(--charcoal);
+  border-left:3px solid currentColor; margin-top:2px;
+  animation: fadeIn 0.2s ease;
+}
+.food-chip-detail.open { display:block; }
+.food-chip-detail strong { display:block; font-weight:700; margin-bottom:3px; }
+
+/* Tab toggle for Cut/Eat on mobile */
+.fg-tabs { display:none; }
+@media(max-width:700px){
+  .food-guide-grid { grid-template-columns:1fr; }
+  .fg-tabs { display:flex; gap:0; margin-bottom:16px; border-radius:12px; overflow:hidden; border:1.5px solid var(--border); }
+  .fg-tab { flex:1; padding:10px; text-align:center; font-size:13px; font-weight:600; cursor:pointer; background:var(--bg2); color:var(--text-muted); border:none; transition:all 0.2s; }
+  .fg-tab.active { background:var(--sage-dark); color:white; }
+  .food-guide-grid > .food-card:last-of-type { display:none; }
+  .food-guide-grid.show-eat > .food-card:first-of-type { display:none; }
+  .food-guide-grid.show-eat > .food-card:last-of-type { display:block; }
+}
 .tag-avoid { background:rgba(212,100,90,0.12); color:var(--soft-red); }
 .tag-limit { background:rgba(201,168,76,0.12); color:#8a6a00; }
 .tag-eat { background:rgba(122,158,126,0.12); color:var(--sage-dark); }
@@ -3471,17 +3503,30 @@ function renderFoodGuidance() {
   eatOther.push({ e:'🌊', n:'Fermented foods (yogurt/curd, kimchi, miso, idli, dosa batter)', r:'Probiotic powerhouses already in Asian cuisine. Support gut microbiome, immunity, and mental health. Eat at least one fermented food daily.', tag:'priority' });
   eatOther.push({ e:'💧', n:'Water with lemon, coconut water (plain, unsweetened)', r:'Traditional hydration drinks in Asia. Coconut water has natural electrolytes. Much better than soda or packaged juice.', tag:'eat' });
 
-  // ── RENDER HTML ──
-  function foodItems(arr) {
-    return arr.map(f => `
-      <div class="food-item">
-        <div class="food-item-emoji">${f.e}</div>
-        <div class="food-item-body">
-          <div class="food-item-name">${f.n}</div>
-          <div class="food-item-reason">${f.r}</div>
-          <span class="food-item-tag tag-${f.tag}">${f.tag === 'avoid' ? '🚫 Avoid' : f.tag === 'limit' ? '⚠️ Limit' : f.tag === 'priority' ? '⭐ Priority Eat' : '✅ Eat'}</span>
-        </div>
-      </div>`).join('');
+  // ── RENDER HTML — compact chip grid ──
+  let _activeChip = null;
+  function foodChips(arr, side) {
+    return arr.map((f, i) => {
+      const id = `chip-${side}-${i}`;
+      const chipClass = `chip-${f.tag}`;
+      const tagLabel = f.tag==='avoid'?'🚫 Avoid': f.tag==='limit'?'⚠️ Limit': f.tag==='priority'?'⭐ Priority':'✅ Eat';
+      return `<span class="food-chip ${chipClass}" id="${id}" onclick="toggleChip('${id}','${side}',${i})" title="${f.n}">${f.e} ${f.n}</span>`;
+    }).join('') +
+    arr.map((f, i) => {
+      const id = `chip-detail-${side}-${i}`;
+      const borderColor = f.tag==='avoid'?'var(--soft-red)': f.tag==='limit'?'var(--gold)':'var(--sage)';
+      return `<div class="food-chip-detail" id="${id}" style="border-left-color:${borderColor}"><strong>${f.e} ${f.n} — <span style="font-size:11px;font-weight:600;">${f.tag==='avoid'?'🚫 Avoid':f.tag==='limit'?'⚠️ Limit':f.tag==='priority'?'⭐ Priority Eat':'✅ Eat'}</span></strong>${f.r}</div>`;
+    }).join('');
+  }
+
+  function foodCat(label, color, arr, side) {
+    if (!arr.length) return '';
+    return `<div class="food-cat-block">
+      <div class="food-cat-label" style="color:${color}">${label}</div>
+      <div class="food-chips" id="chips-${side}-${label.replace(/\W/g,'')}">
+        ${foodChips(arr, side+'-'+label.replace(/\W/g,''))}
+      </div>
+    </div>`;
   }
 
   const avoidAll = [...avoidMeat, ...avoidFruits, ...avoidGrains, ...avoidOther];
@@ -3503,13 +3548,13 @@ function renderFoodGuidance() {
           <div class="food-card-icon" style="background:rgba(212,100,90,0.12);">🚫</div>
           <div>
             <div class="food-card-title">Foods to Cut Out / Limit</div>
-            <div class="food-card-sub">${avoidAll.filter(x=>x.tag==='avoid').length} to avoid · ${avoidAll.filter(x=>x.tag==='limit').length} to limit — based on your profile</div>
+            <div class="food-card-sub">${avoidAll.filter(x=>x.tag==='avoid').length} to avoid · ${avoidAll.filter(x=>x.tag==='limit').length} to limit — tap any chip for details</div>
           </div>
         </div>
-        ${avoidMeat.length ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--soft-red);margin-bottom:6px;margin-top:4px;">🥩 Meat & Protein</div>${foodItems(avoidMeat)}` : ''}
-        ${avoidFruits.length ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--soft-red);margin:12px 0 6px;">🍎 Fruits & Drinks</div>${foodItems(avoidFruits)}` : ''}
-        ${avoidGrains.length ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--soft-red);margin:12px 0 6px;">🍚 Grains & Carbs</div>${foodItems(avoidGrains)}` : ''}
-        ${avoidOther.length ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--soft-red);margin:12px 0 6px;">🧂 Other Items</div>${foodItems(avoidOther)}` : ''}
+        ${foodCat('🥩 Meat & Protein','var(--soft-red)', avoidMeat, 'avoid')}
+        ${foodCat('🍎 Fruits & Drinks','var(--soft-red)', avoidFruits, 'avoid')}
+        ${foodCat('🍚 Grains & Carbs','var(--soft-red)', avoidGrains, 'avoid')}
+        ${foodCat('🧂 Other Items','var(--soft-red)', avoidOther, 'avoid')}
       </div>
 
       <!-- EAT COLUMN -->
@@ -3518,13 +3563,13 @@ function renderFoodGuidance() {
           <div class="food-card-icon" style="background:rgba(122,158,126,0.15);">✅</div>
           <div>
             <div class="food-card-title">Foods to Start / Prioritize</div>
-            <div class="food-card-sub">${eatAll.filter(x=>x.tag==='priority').length} priority foods · ${eatAll.filter(x=>x.tag==='eat').length} recommended — for your goals</div>
+            <div class="food-card-sub">${eatAll.filter(x=>x.tag==='priority').length} priority · ${eatAll.filter(x=>x.tag==='eat').length} recommended — tap any chip for details</div>
           </div>
         </div>
-        ${eatMeat.length ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--sage-dark);margin-bottom:6px;margin-top:4px;">🥩 Meat & Protein</div>${foodItems(eatMeat)}` : ''}
-        ${eatFruits.length ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--sage-dark);margin:12px 0 6px;">🍎 Fruits to Eat</div>${foodItems(eatFruits)}` : ''}
-        ${eatGrains.length ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--sage-dark);margin:12px 0 6px;">🌾 Grains & Carbs</div>${foodItems(eatGrains)}` : ''}
-        ${eatOther.length ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--sage-dark);margin:12px 0 6px;">🌿 Superfoods & Staples</div>${foodItems(eatOther)}` : ''}
+        ${foodCat('🥩 Meat & Protein','var(--sage-dark)', eatMeat, 'eat')}
+        ${foodCat('🍎 Fruits to Eat','var(--sage-dark)', eatFruits, 'eat')}
+        ${foodCat('🌾 Grains & Carbs','var(--sage-dark)', eatGrains, 'eat')}
+        ${foodCat('🌿 Superfoods & Staples','var(--sage-dark)', eatOther, 'eat')}
       </div>
     </div>
 
@@ -3566,8 +3611,30 @@ function renderFoodGuidance() {
   `;
 }
 
+// Chip expand/collapse for food guidance
+window.toggleChip = function(chipId, side, idx) {
+  const detailId = chipId.replace('chip-', 'chip-detail-');
+  const chip = document.getElementById(chipId);
+  const detail = document.getElementById(detailId);
+  if (!chip || !detail) return;
 
-</script>
+  const isOpen = detail.classList.contains('open');
+
+  // Close all other open details in same card
+  chip.closest('.food-card').querySelectorAll('.food-chip-detail.open').forEach(d => {
+    d.classList.remove('open');
+  });
+  chip.closest('.food-card').querySelectorAll('.food-chip.active').forEach(c => {
+    c.classList.remove('active');
+  });
+
+  if (!isOpen) {
+    detail.classList.add('open');
+    chip.classList.add('active');
+    // Scroll chip into view smoothly
+    chip.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  }
+};</script>
 
 <!-- ==================== FIREBASE ==================== -->
 
