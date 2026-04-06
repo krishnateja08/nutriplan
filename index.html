@@ -705,16 +705,16 @@ footer { text-align: center; padding: 24px; font-size: 12px; color: var(--text-m
         <div class="btn-option condition" onclick="toggleCondition(this,'pcos')">🌸 PCOS</div>
         <div class="btn-option condition" onclick="toggleCondition(this,'heart')">💙 Heart Condition</div>
         <div class="btn-option condition" onclick="toggleCondition(this,'kidney')">🫘 Kidney / Renal</div>
-        <div class="btn-option condition" onclick="clearConditions(this)" data-i18n="none">✅ None</div>
+        <div class="btn-option condition selected" onclick="clearConditions(this)" data-i18n="none">✅ None</div>
       </div>
     </div>
     <div class="form-section">
       <div class="section-title"><span class="section-icon">🥗</span> <span data-i18n="diet_pref">Diet Preference</span></div>
       <div class="btn-group" id="diet-group">
-        <div class="btn-option" onclick="selectOpt(this,'diet-group','vegetarian')" data-i18n="vegetarian">🌱 Vegetarian</div>
-        <div class="btn-option" onclick="selectOpt(this,'diet-group','vegan')" data-i18n="vegan">🌿 Vegan</div>
-        <div class="btn-option" onclick="selectOpt(this,'diet-group','non-veg')" data-i18n="non_veg">🍗 Non-Vegetarian</div>
-        <div class="btn-option" onclick="selectOpt(this,'diet-group','keto')" data-i18n="keto">🥑 Keto / Low-Carb</div>
+        <div class="btn-option" onclick="toggleDiet(this,'vegetarian')" data-val="vegetarian" data-i18n="vegetarian">🌱 Vegetarian</div>
+        <div class="btn-option" onclick="toggleDiet(this,'vegan')" data-val="vegan" data-i18n="vegan">🌿 Vegan</div>
+        <div class="btn-option" onclick="toggleDiet(this,'non-veg')" data-val="non-veg" data-i18n="non_veg">🍗 Non-Vegetarian</div>
+        <div class="btn-option" onclick="toggleDiet(this,'keto')" data-val="keto" data-i18n="keto">🥑 Keto / Low-Carb</div>
       </div>
     </div>
     <div class="form-section full" style="text-align:center;padding:36px;">
@@ -1434,6 +1434,19 @@ function toggleDark() {
 // ========== STATE ==========
 let profile = {};
 let conditions = new Set();
+let diets = new Set();
+function toggleDiet(el, val) {
+  if (el.classList.contains('selected')) {
+    el.classList.remove('selected');
+    diets.delete(val);
+  } else {
+    el.classList.add('selected');
+    diets.add(val);
+  }
+}
+function getSelectedDiets() {
+  return [...diets];
+}
 let plan = null;
 let waterCups = 0;
 let waterTarget = 8;
@@ -1537,7 +1550,7 @@ function generatePlan(silent) {
   const gender = getSelected('gender-group');
   const activity = getSelected('activity-group');
   const goal = getSelected('goal-group');
-  const diet = getSelected('diet-group');
+  const diet = getSelectedDiets().join(',') || null;
 
   // Check which fields are missing and highlight them
   const missing = [];
@@ -1893,10 +1906,11 @@ function renderAlerts() {
   const p=plan;
   const alerts=[];
   const cond=p.conditions;
-  const isKeto=p.diet==='keto';
-  const isVegan=p.diet==='vegan';
-  const isVeg=p.diet==='vegetarian';
-  const isNonVeg=p.diet==='non-veg';
+  const dietVals = (p.diet || '').split(',').map(v=>v.trim());
+  const isKeto=dietVals.includes('keto');
+  const isVegan=dietVals.includes('vegan');
+  const isVeg=dietVals.includes('vegetarian');
+  const isNonVeg=dietVals.includes('non-veg');
   const isFemale=p.gender==='Female';
   const isMale=p.gender==='Male';
   const isLose=p.goal==='lose';
@@ -4282,7 +4296,16 @@ async function loadProfile(user) {
       if (d.ethnicity) setButtonGroup('ethnicity-group', d.ethnicity);
       if (d.activity) setButtonGroup('activity-group', d.activity);
       if (d.goal)     setButtonGroup('goal-group', d.goal);
-      if (d.diet)     setButtonGroup('diet-group', d.diet);
+      if (d.diet) {
+        diets.clear();
+        document.querySelectorAll('#diet-group .btn-option').forEach(b => b.classList.remove('selected'));
+        const dietVals = d.diet.split(',').map(v => v.trim()).filter(Boolean);
+        dietVals.forEach(v => {
+          diets.add(v);
+          const btn = document.querySelector('#diet-group .btn-option[data-val="' + v + '"]');
+          if (btn) btn.classList.add('selected');
+        });
+      }
       if (d.conditions && Array.isArray(d.conditions)) {
         document.querySelectorAll('#condition-group .btn-option').forEach(b => b.classList.remove('selected'));
         d.conditions.forEach(c => {
@@ -4369,7 +4392,7 @@ window.fbSaveProfile = async function() {
     ethnicity:    getSelected('ethnicity-group') || 'non-asian',
     activity:     getSelected('activity-group'),
     goal:         getSelected('goal-group'),
-    diet:         getSelected('diet-group'),
+    diet:         getSelectedDiets().join(',') || null,
     conditions:   selectedConditions,
     savedAt:      new Date().toISOString(),
   };
